@@ -13,6 +13,10 @@ public class GuardController : MonoBehaviour
     float fovDistance = 20.0f;
     float fovAngle = 45.0f;
 
+    // Debug/Visualization
+    [Header("Debug/Visualization")]
+    public bool showFOVGizmos = true;
+
     // Chasing settings
 
     public float chasingSpeed = 2.0f;
@@ -23,6 +27,8 @@ public class GuardController : MonoBehaviour
     public float patrolDistance = 10.0f;
     float patrolWait = 5.0f;
     float patrolTimePassed = 0;
+
+    public float knockRadius = 20.0f;
 
     bool ICanSee(Transform player)
     {
@@ -45,7 +51,8 @@ public class GuardController : MonoBehaviour
     // Start is called once before the first execution of Update after the MonoBehaviour is created
     void Start()
     {
-        
+        patrolTimePassed = patrolWait;
+        lastPlaceSeen = transform.position;
     }
 
     // Update is called once per frame
@@ -89,7 +96,7 @@ public class GuardController : MonoBehaviour
 
     void Chase(Transform player)
     {
-        GetComponent<UnityEngine.AI.NavMeshAgent>().Stop();
+        GetComponent<UnityEngine.AI.NavMeshAgent>().isStopped = true;
         GetComponent<UnityEngine.AI.NavMeshAgent>().ResetPath();
 
         Vector3 direction = player.position - transform.position;
@@ -116,7 +123,7 @@ public class GuardController : MonoBehaviour
             Debug.Log("Guard's state: " + curState + " point " + lastPlaceSeen);
         }
     }
-    
+
     void Patrol()
     {
         patrolTimePassed += Time.deltaTime;
@@ -131,6 +138,66 @@ public class GuardController : MonoBehaviour
 
             // Make the generated point a goal for the agent
             GetComponent<UnityEngine.AI.NavMeshAgent>().SetDestination(patrollingPoint);
+        }
+    }
+    
+    public void InvestigatePoint(Vector3 point)
+    { 
+        lastPlaceSeen = point;
+        curState = State.Investigate;
+    }
+
+    // Draw the field of view cone in the Scene view (always visible)
+    void OnDrawGizmos()
+    {
+        if (!showFOVGizmos)
+            return;
+        // Set color based on whether the guard can see the player
+        if (player != null && ICanSee(player))
+        {
+            Gizmos.color = Color.red; // Red when player is detected
+        }
+        else
+        {
+            Gizmos.color = Color.yellow; // Yellow when no player detected
+        }
+
+        // Draw the cone
+        Vector3 forward = transform.forward * fovDistance;
+        Vector3 startPos = transform.position;
+
+        // Calculate the left and right boundaries of the cone
+        Quaternion leftRayRotation = Quaternion.AngleAxis(-fovAngle, Vector3.up);
+        Quaternion rightRayRotation = Quaternion.AngleAxis(fovAngle, Vector3.up);
+
+        Vector3 leftRayDirection = leftRayRotation * forward;
+        Vector3 rightRayDirection = rightRayRotation * forward;
+
+        // Draw the cone lines
+        Gizmos.DrawLine(startPos, startPos + leftRayDirection);
+        Gizmos.DrawLine(startPos, startPos + rightRayDirection);
+        Gizmos.DrawLine(startPos, startPos + forward);
+
+        // Draw an arc to represent the cone's range
+        int segments = 20;
+        Vector3 previousPoint = startPos + leftRayDirection;
+
+        for (int i = 1; i <= segments; i++)
+        {
+            float angle = -fovAngle + (2 * fovAngle * i / segments);
+            Quaternion rotation = Quaternion.AngleAxis(angle, Vector3.up);
+            Vector3 direction = rotation * forward;
+            Vector3 point = startPos + direction;
+
+            Gizmos.DrawLine(previousPoint, point);
+            previousPoint = point;
+        }
+
+        // Optional: Draw a ray to the player if visible
+        if (player != null && ICanSee(player))
+        {
+            Gizmos.color = Color.red;
+            Gizmos.DrawLine(startPos, player.position);
         }
     }
 }   
