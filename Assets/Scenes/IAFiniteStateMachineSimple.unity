@@ -2420,6 +2420,22 @@ PrefabInstance:
       propertyPath: m_LocalEulerAnglesHint.z
       value: 0
       objectReference: {fileID: 0}
+    - target: {fileID: 2958615936493218783, guid: 34caf90522071ba4b8118136739a0bf8, type: 3}
+      propertyPath: m_Resource
+      value: 
+      objectReference: {fileID: 8300000, guid: 79777e6268b558444ac51a18e5af42ff, type: 3}
+    - target: {fileID: 2958615936493218783, guid: 34caf90522071ba4b8118136739a0bf8, type: 3}
+      propertyPath: m_PlayOnAwake
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 6098802131262641639, guid: 34caf90522071ba4b8118136739a0bf8, type: 3}
+      propertyPath: moveSpeed
+      value: 10
+      objectReference: {fileID: 0}
+    - target: {fileID: 6098802131262641639, guid: 34caf90522071ba4b8118136739a0bf8, type: 3}
+      propertyPath: knockRadius
+      value: 40
+      objectReference: {fileID: 0}
     - target: {fileID: 6098802131262641639, guid: 34caf90522071ba4b8118136739a0bf8, type: 3}
       propertyPath: rotationSpeed
       value: 180
