@@ -1,29 +1,42 @@
 using UnityEngine;
 
+// ============================================================================
+// GuardController
+//  - FSM: Patrol, Investigate, Chase
+//  - Visión: detección por cono (distancia + ángulo) con raycast
+//  - Movemento: NavMeshAgent para patrullar/investigar e movemento directo en chase
+//  - Depuración: debuxo do FOV en Game/Scene para axuste visual
+//  - Entrada externa: pode recibir puntos de investigación (ruído/knock)
+// ============================================================================
+
 [RequireComponent(typeof(UnityEngine.AI.NavMeshAgent))] // Require un NavMeshAgent para o movemento
 public class GuardController : MonoBehaviour // Controlador de gardián con FSM (Finite State Machine)
 {
     enum State { Patrol, Investigate, Chase }; // Estados da FSM: Patrullar, Investigar, Perseguir
-    State curState = State.Patrol; // Estado actual, comeza en Patrol
-
+    State currentState = State.Patrol; // Estado actual, comeza en Patrol
     Vector3 lastPlaceSeen; // Última posición onde se viu o xogador
     public Transform player; // Referencia ao transform do xogador
-    float fovDistance = 20.0f; // Distancia do campo de visión
-    float fovAngle = 45.0f; // Ángulo do campo de visión (en graos)
 
     [Header("Debug/Visualization")]
     public bool showFOVGizmos = true; // Mostrar o campo de visión en pantalla
+    public float fovDistance = 20.0f; // Distancia do campo de visión
+    public float fovAngle = 45.0f; // Ángulo do campo de visión (en graos)
 
+    [Header("Chase Settings")]
     public float chasingSpeed = 2.0f; // Velocidade ao perseguir
     public float chasingRotSpeed = 2.0f; // Velocidade de rotación ao perseguir
     public float chasingAccuracy = 5.0f; // Distancia mínima ao xogador ao perseguir
 
+    [Header("Patrol Settings")]
     public float patrolDistance = 10.0f; // Radio de patrulla
     public float patrolWait = 5.0f; // Tempo de espera entre puntos de patrulla
-    float patrolTimePassed = 0; // Tempo pasado desde o último cambio de punto
+    float patrolTimePassed = 0; // Tempo pasado desde o último cambio de punto de patrulla
 
-    public float knockRadius = 20.0f; // Radio para detectar sons/ruídos
-
+    //=========================================================================
+    // Comproba se o gardián pode ver ao xogador dentro do seu campo de visión (distancia e ángulo) e sen obstrucións.
+    // Parám.: player -> Transform do xogador a comprobar
+    // Dev.: true se é visible; false en caso contrario
+    //=========================================================================
     bool ICanSee(Transform player) // Comproba se o gardián pode ver o xogador
     {
         Vector3 direction = player.position - this.transform.position; // Dirección ao xogador
@@ -42,30 +55,37 @@ public class GuardController : MonoBehaviour // Controlador de gardián con FSM 
         return false;
     }
 
+    //=========================================================================
+    // Inicializa contadores internos e define a última posición vista como a posición actual
+    //=========================================================================
     void Start()
     {
         patrolTimePassed = patrolWait; // Inicia listo para escoller un punto de patrulla
         lastPlaceSeen = transform.position; // A última posición vista é a actual
     }
 
+    //=========================================================================
+    // Actualiza a FSM do garda: detecta o xogador, troca de estado e executa a lóxica correspondente
+    // Tamén invoca o debuxo do FOV en tempo real
+    //=========================================================================
     void Update()
     {
-        State tmpstate = curState; // Garda o estado actual para detectar cambios
+        State tempState = currentState; // Garda o estado actual para detectar cambios
 
         if (ICanSee(player)) // Se ve o xogador
         {
-            curState = State.Chase; // Cambia a perseguir
+            currentState = State.Chase; // Cambia a perseguir
             lastPlaceSeen = player.position; // Actualiza a última posición vista
         }
         else
         {
-            if (curState == State.Chase) // Se estaba perseguindo e xa non ve o xogador
+            if (currentState == State.Chase) // Se estaba perseguindo e xa non ve o xogador
             {
-                curState = State.Investigate; // Cambia a investigar
+                currentState = State.Investigate; // Cambia a investigar
             }
         }
 
-        switch (curState) // Executa a lóxica do estado actual
+        switch (currentState) // Executa a lóxica do estado actual
         {
             case State.Patrol:
                 Patrol();
@@ -77,14 +97,19 @@ public class GuardController : MonoBehaviour // Controlador de gardián con FSM 
                 Chase(player);
                 break;
         }
-        
-        if (tmpstate != curState) // Se o estado cambiou
+
+        if (tempState != currentState) // Se o estado cambiou
         {
-            Debug.Log("Guard's state: " + curState); // Rexistra o novo estado
+            Debug.Log("Guard's state: " + currentState); // Rexistra o novo estado
         }
 
         DrawFOVDebug(); // Debuxa o FOV en play mode
     }
+
+    //=========================================================================
+    // Persegue ao xogador rotando cara a el e avanzando ata acadar unha precisión mínima
+    // Parám.: player -> Transform do xogador que se persegue
+    //=========================================================================
 
     void Chase(Transform player) // Persegue o xogador
     {
@@ -101,21 +126,26 @@ public class GuardController : MonoBehaviour // Controlador de gardián con FSM 
         }
     }
 
+    //=========================================================================
+    // Desprázase á última posición coñecida do xogador; cando chega, volve ao estado de patrulla
+    //=========================================================================
     void Investigate() // Investiga a última posición onde se viu o xogador
     {
         float distanceToTarget = Vector3.Distance(transform.position, lastPlaceSeen); // Distancia ao obxectivo
-        
+
         if (distanceToTarget < GetComponent<UnityEngine.AI.NavMeshAgent>().stoppingDistance + 0.5f) // Se chegou ao punto
         {
-            curState = State.Patrol; // Cambia a patrullar
+            currentState = State.Patrol; // Cambia a patrullar
         }
         else
         {
             GetComponent<UnityEngine.AI.NavMeshAgent>().SetDestination(lastPlaceSeen); // Move cara o punto a investigar
-            Debug.Log("Guard's state: " + curState + " point " + lastPlaceSeen);
+            Debug.Log("Guard's state: " + currentState + " point " + lastPlaceSeen);
         }
     }
-
+    //=========================================================================
+    // Patrulla xerando puntos aleatorios arredor e navegando cara eles tras un tempo de espera
+    //=========================================================================
     void Patrol() // Patrulla por puntos aleatorios
     {
         patrolTimePassed += Time.deltaTime; // Incrementa o contador de tempo
@@ -131,12 +161,19 @@ public class GuardController : MonoBehaviour // Controlador de gardián con FSM 
         }
     }
 
+    //=========================================================================
+    // Ordena investigar un punto externo (p.ex. a orixe dun ruído) e muda o estado a Investigar
+    // Parám.: point -> Posición do mundo a investigar
+    //=========================================================================        
     public void InvestigatePoint(Vector3 point) // Ordena ao gardián investigar un punto específico
     {
         lastPlaceSeen = point; // Establece o punto a investigar
-        curState = State.Investigate; // Cambia a estado Investigate
+        currentState = State.Investigate; // Cambia a estado Investigate
     }
-    
+
+    //=========================================================================
+    // Debuxa o cono de visión no Game View durante a execución usando Debug.DrawLine
+    //=========================================================================
     void DrawFOVDebug() // Debuxa o FOV en play mode usando Debug.DrawLine
     {
         if (!showFOVGizmos)
@@ -176,7 +213,10 @@ public class GuardController : MonoBehaviour // Controlador de gardián con FSM 
             Debug.DrawLine(startPos, player.position, Color.red); // Debuxa unha liña ata o xogador
         }
     }
-
+    
+    //=========================================================================
+    // Debuxa o cono de visión na Scene View do editor para facilitar o axuste de parámetros
+    //=========================================================================
     void OnDrawGizmos() // Debuxa o FOV na vista Scene do editor
     {
         if (!showFOVGizmos)
